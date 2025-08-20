@@ -94,7 +94,6 @@ public struct PlayerView: View {
     
     var songSlider: some View {
         VStack(spacing: 10) {
-            // --- REPLACED Slider WITH CustomSlider ---
             CustomSlider(
                 value: $seekValue,
                 range: 0...(max(0.001, viewModel.duration)),
@@ -104,13 +103,12 @@ public struct PlayerView: View {
                         viewModel.seek(to: seekValue)
                     }
                 },
-                trackHeight: 2, // Customize your line height
-                thumbSize: 24   // Customize your ball size
+                trackHeight: 2,
+                thumbSize: 24
             )
             .padding(.horizontal, 20)
              
             HStack {
-                // The text now uses seekValue directly while seeking
                 Text(Self.formatTime(isSeeking ? seekValue : viewModel.currentTime))
                     .foregroundStyle(.white.opacity(0.9))
                     .font(.system(size: 12, weight: .regular, design: .monospaced))
