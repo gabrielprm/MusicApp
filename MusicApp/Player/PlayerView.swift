@@ -1,28 +1,24 @@
 import SwiftUI
 
 public struct PlayerView: View {
-    @StateObject private var viewModel: PlayerViewModel = PlayerViewModel()
+    @EnvironmentObject private var viewModel: PlayerViewModel
     @State private var isSeeking = false
     @State private var seekValue: Double = 0
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    let song: Song
     
     public var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                
-                navigationBar
-                
                 Spacer(minLength: 40)
-                
                 artWork
-                
                 Spacer()
-                
                 songMetadata
-                
                 songSlider
-
                 songControls
             }
         }
@@ -30,60 +26,78 @@ public struct PlayerView: View {
             if !isSeeking { seekValue = new }
         }
         .onAppear {
+            viewModel.selectSong(song)
             seekValue = viewModel.currentTime
         }
-    }
-    
-    var navigationBar: some View {
-        HStack {
-            Button(action: viewModel.didTapBack) {
-                Image(systemName: "chevron.backward")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .contentShape(Rectangle())
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.backward")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
             }
-            Spacer()
-            Button(action: viewModel.didTapMenu) {
-                Image(systemName: "ellipsis")
-                    .rotationEffect(.degrees(90))
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .contentShape(Rectangle())
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: { viewModel.showMoreOptions.toggle() }) {
+                    Image(systemName: "ellipsis")
+                        .rotationEffect(.degrees(90))
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
+        .sheet(isPresented: $viewModel.showMoreOptions) {
+            MoreOptionsView(viewModel: viewModel)
+                .preferredColorScheme(.dark)
+        }
+        .sheet(isPresented: $viewModel.showAlbumSheet) {
+            AlbumSongsView(viewModel: viewModel)
+                .preferredColorScheme(.dark)
+        }
     }
     
     var artWork: some View {
         Group {
-             if let art = viewModel.artwork {
-                 art
-                     .resizable()
-                     .scaledToFill()
-             } else {
-                 ZStack {
-                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                         .fill(Color.white.opacity(0.08))
-                     Image(systemName: "music.note")
-                         .font(.system(size: 88, weight: .regular))
-                         .foregroundStyle(Color.white.opacity(0.9))
-                 }
-             }
+            AsyncImage(url: viewModel.currentSong?.artworkUrlLarge) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    songEmptyImageView
+                case .empty:
+                    ProgressView()
+                @unknown default:
+                    songEmptyImageView
+                }
+            }
          }
          .frame(width: 200, height: 200)
          .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
          .padding(.bottom, 36)
     }
     
+    var songEmptyImageView: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+            Image(systemName: "music.note")
+                .font(.system(size: 88, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.9))
+        }
+    }
+    
     var songMetadata: some View {
         VStack(spacing: 6) {
-            Text(viewModel.title.isEmpty ? "Unknown Title" : viewModel.title)
+            Text(viewModel.currentSong?.trackName ?? "Unknown Title")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(viewModel.artist.isEmpty ? "Unknown Artist" : viewModel.artist)
+            
+            Text(viewModel.currentSong?.artistName ?? "Unknown Artist")
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(.white.opacity(0.8))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -96,7 +110,7 @@ public struct PlayerView: View {
         VStack(spacing: 10) {
             CustomSlider(
                 value: $seekValue,
-                range: 0...(max(0.001, viewModel.duration)),
+                range: 0...(max(0.001, viewModel.currentSong?.trackDuration ?? 0.001)),
                 onEditingChanged: { editing in
                     isSeeking = editing
                     if !editing {
@@ -113,7 +127,7 @@ public struct PlayerView: View {
                     .foregroundStyle(.white.opacity(0.9))
                     .font(.system(size: 12, weight: .regular, design: .monospaced))
                 Spacer()
-                let remaining = viewModel.duration - (isSeeking ? seekValue : viewModel.currentTime)
+                let remaining = (viewModel.currentSong?.trackDuration ?? 0.0) - (isSeeking ? seekValue : viewModel.currentTime)
                 Text("-" + Self.formatTime(max(0, remaining)))
                     .foregroundStyle(.white.opacity(0.9))
                     .font(.system(size: 12, weight: .regular, design: .monospaced))

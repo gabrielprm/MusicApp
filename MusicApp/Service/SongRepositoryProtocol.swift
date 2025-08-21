@@ -24,11 +24,9 @@ class SongRepository: SongRepositoryProtocol {
     }
     
     func fetchSongs(forAlbumId albumId: Int) async throws -> [Song] {
-            let response = try await apiService.fetchSongs(forAlbumId: albumId)
-            
-            // The API returns the album metadata as the first result.
-            // We filter the results to only include items where wrapperType is "track".
-            let songs = response.results.filter { $0.wrapperType == "track" }
-            return songs
-        }
+        let response = try await apiService.fetchSongs(forAlbumId: albumId)
+        
+        let songs = response.results.filter { $0.wrapperType == "track" }
+        return songs
+    }
 }

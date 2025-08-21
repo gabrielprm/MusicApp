@@ -26,10 +26,11 @@ protocol APIServiceProtocol {
 }
 
 class APIService: APIServiceProtocol {
-    private let baseURL = "https://itunes.apple.com/search"
-
+    private let baseSearchURL = "https://itunes.apple.com/search"
+    private let baseLookupURL = "https://itunes.apple.com/lookup"
+    
     func search(term: String, limit: Int, offset: Int) async throws -> SearchResponse {
-        var components = URLComponents(string: baseURL)
+        var components = URLComponents(string: baseSearchURL)
         components?.queryItems = [
             URLQueryItem(name: "term", value: term),
             URLQueryItem(name: "entity", value: "song"),
@@ -60,31 +61,31 @@ class APIService: APIServiceProtocol {
     }
     
     func fetchSongs(forAlbumId albumId: Int) async throws -> SearchResponse {
-            var components = URLComponents(string: baseURL)
-            components?.queryItems = [
-                URLQueryItem(name: "id", value: String(albumId)),
-                URLQueryItem(name: "entity", value: "song")
-            ]
-
-            guard let url = components?.url else {
-                throw APIError.invalidURL
-            }
-
-            do {
-                let (data, response) = try await URLSession.shared.data(from: url)
-                
-                guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                    throw APIError.invalidResponse
-                }
-
-                let decoder = JSONDecoder()
-                let searchResponse = try decoder.decode(SearchResponse.self, from: data)
-                return searchResponse
-
-            } catch let error as DecodingError {
-                throw APIError.decodingError(description: error.localizedDescription)
-            } catch {
-                throw APIError.requestFailed(description: error.localizedDescription)
-            }
+        var components = URLComponents(string: baseLookupURL)
+        components?.queryItems = [
+            URLQueryItem(name: "id", value: String(albumId)),
+            URLQueryItem(name: "entity", value: "song")
+        ]
+        
+        guard let url = components?.url else {
+            throw APIError.invalidURL
         }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                throw APIError.invalidResponse
+            }
+            
+            let decoder = JSONDecoder()
+            let searchResponse = try decoder.decode(SearchResponse.self, from: data)
+            return searchResponse
+            
+        } catch let error as DecodingError {
+            throw APIError.decodingError(description: error.localizedDescription)
+        } catch {
+            throw APIError.requestFailed(description: error.localizedDescription)
+        }
+    }
 }
