@@ -18,11 +18,15 @@ final class SongListViewModel: ObservableObject {
     private var currentPage = 1
     private var currentSearchTerm = ""
     private var canLoadMorePages = true
-    private let resultsPerPage = 20
+    private let resultsPerPage: Int
     
     // MARK: - Initializer
     
-    init(repository: SongRepositoryProtocol = SongRepository()) {
+    init(
+        resultsPerPage: Int = 20,
+        repository: SongRepositoryProtocol = SongRepository()
+    ) {
+        self.resultsPerPage = resultsPerPage
         self.repository = repository
     }
     
