@@ -1,5 +1,5 @@
 import XCTest
-@testable import MusicApp // Replace with your project name
+@testable import MusicApp
 
 @MainActor
 final class AlbumSongsViewModelTests: XCTestCase {

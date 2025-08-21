@@ -9,18 +9,14 @@ struct SearchView: View {
             Color.black.ignoresSafeArea()
 
             NavigationStack {
-                // The body is now much simpler.
-                // It just displays the list or the empty state.
                 Group {
                     if viewModel.songs.isEmpty && !viewModel.isLoading && viewModel.errorMessage == nil {
                         emptyStateView
                     } else {
-                        // We now call our extracted list view property.
                         resultsListView
                     }
                 }
                 .navigationTitle("Songs")
-                // Apply modifiers that are common to both states here.
                 .toolbarBackground(Color.black, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
             }
@@ -38,8 +34,6 @@ struct SearchView: View {
         }
     }
     
-    // --- This is the extracted view property ---
-    /// A computed property that contains the complex list view.
     private var resultsListView: some View {
         List {
             ForEach(viewModel.songs) { song in
