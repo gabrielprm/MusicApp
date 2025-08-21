@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct AlbumSongsView: View {
-    @ObservedObject var viewModel: PlayerViewModel
+    @ObservedObject var viewModel: AlbumSongsViewModel
+    @EnvironmentObject var playerViewModel: PlayerViewModel
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -10,14 +11,14 @@ struct AlbumSongsView: View {
                 .font(.headline)
                 .fontWeight(.bold)
                 .padding(.top, 24)
-                .padding(.bottom, 10)
+                .padding(.bottom, 24)
 
             List {
                 ForEach(viewModel.albumSongs) { song in
                     SongRowView(song: song)
                         .onTapGesture {
                             dismiss()
-                            viewModel.selectSong(song)
+                            playerViewModel.selectSong(song)
                         }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.black)
@@ -29,5 +30,10 @@ struct AlbumSongsView: View {
         .presentationBackground(Color.black)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .onAppear {
+            Task {
+                await viewModel.fetchAlbumSongs()
+            }
+        }
     }
 }

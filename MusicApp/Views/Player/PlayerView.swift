@@ -1,14 +1,11 @@
 import SwiftUI
 
 public struct PlayerView: View {
-    @EnvironmentObject private var viewModel: PlayerViewModel
+    @StateObject var viewModel: PlayerViewModel
     @State private var isSeeking = false
-    @State private var seekValue: Double = 0
     
     @Environment(\.dismiss) private var dismiss
-    
-    let song: Song
-    
+
     public var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -23,28 +20,27 @@ public struct PlayerView: View {
             }
         }
         .onChange(of: viewModel.currentTime) { _, new in
-            if !isSeeking { seekValue = new }
+            if !isSeeking { viewModel.seekValue = new }
         }
         .onAppear {
-            viewModel.selectSong(song)
-            seekValue = viewModel.currentTime
+            viewModel.selectSong(viewModel.song)
+            viewModel.seekValue = viewModel.currentTime
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: { dismiss() }) {
-                    Image(systemName: "chevron.backward")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
+                    Image.Icons.icArrowLeft
+                        .resizable()
+                        .frame(width: 24, height: 24)
                 }
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { viewModel.showMoreOptions.toggle() }) {
-                    Image(systemName: "ellipsis")
-                        .rotationEffect(.degrees(90))
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
+                    Image.Icons.icMore
+                        .resizable()
+                        .frame(width: 24, height: 24)
                 }
             }
         }
@@ -53,14 +49,17 @@ public struct PlayerView: View {
                 .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $viewModel.showAlbumSheet) {
-            AlbumSongsView(viewModel: viewModel)
-                .preferredColorScheme(.dark)
+            if let albumId = viewModel.currentSong?.collectionId {
+                AlbumSongsView(viewModel: AlbumSongsViewModel(albumId: albumId))
+                    .environmentObject(viewModel)
+                    .preferredColorScheme(.dark)
+            }
         }
     }
     
     var artWork: some View {
         Group {
-            AsyncImage(url: viewModel.currentSong?.artworkUrlLarge) { phase in
+            CachedAsyncImage(url: viewModel.currentSong?.artworkUrlLarge) { phase in
                 switch phase {
                 case .success(let image):
                     image
@@ -82,11 +81,11 @@ public struct PlayerView: View {
     
     var songEmptyImageView: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-            Image(systemName: "music.note")
-                .font(.system(size: 88, weight: .regular))
-                .foregroundStyle(Color.white.opacity(0.9))
+            RoundedRectangle(cornerRadius: 38, style: .continuous)
+                .fill(Color.Theme.DarkAlphaInvert)
+            Image.Icons.icMusicNote
+                .resizable()
+                .frame(width: 116, height: 116)
         }
     }
     
@@ -109,12 +108,12 @@ public struct PlayerView: View {
     var songSlider: some View {
         VStack(spacing: 10) {
             CustomSlider(
-                value: $seekValue,
+                value: $viewModel.seekValue,
                 range: 0...(max(0.001, viewModel.currentSong?.trackDuration ?? 0.001)),
                 onEditingChanged: { editing in
                     isSeeking = editing
                     if !editing {
-                        viewModel.seek(to: seekValue)
+                        viewModel.seek(to: viewModel.seekValue)
                     }
                 },
                 trackHeight: 2,
@@ -122,28 +121,31 @@ public struct PlayerView: View {
             )
             .padding(.horizontal, 20)
              
-            HStack {
-                Text(Self.formatTime(isSeeking ? seekValue : viewModel.currentTime))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .font(.system(size: 12, weight: .regular, design: .monospaced))
-                Spacer()
-                let remaining = (viewModel.currentSong?.trackDuration ?? 0.0) - (isSeeking ? seekValue : viewModel.currentTime)
-                Text("-" + Self.formatTime(max(0, remaining)))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .font(.system(size: 12, weight: .regular, design: .monospaced))
-            }
-            .padding(.horizontal, 20)
+            timeIndicators
         }
         .padding(.bottom, 18)
+    }
+    
+    var timeIndicators: some View {
+        HStack {
+            Text(Self.formatTime(isSeeking ? viewModel.seekValue : viewModel.currentTime))
+                .foregroundStyle(.white.opacity(0.9))
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
+            Spacer()
+            let remaining = (viewModel.currentSong?.trackDuration ?? 0.0) - (isSeeking ? viewModel.seekValue : viewModel.currentTime)
+            Text("-" + Self.formatTime(max(0, remaining)))
+                .foregroundStyle(.white.opacity(0.9))
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
+        }
+        .padding(.horizontal, 20)
     }
     
     var songControls: some View {
         HStack(spacing: 36) {
             Button(action: viewModel.skipBackward) {
-                Image(systemName: "backward.end.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .contentShape(Rectangle())
+                Image.Icons.icBackward
+                    .resizable()
+                    .frame(width: 48, height: 48)
             }
             Button(action: viewModel.playPause) {
                 ZStack {
@@ -158,10 +160,9 @@ public struct PlayerView: View {
                 .accessibilityLabel(viewModel.isPlaying ? "Pause" : "Play")
             }
             Button(action: viewModel.skipForward) {
-                Image(systemName: "forward.end.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .contentShape(Rectangle())
+                Image.Icons.icForward
+                    .resizable()
+                    .frame(width: 48, height: 48)
             }
         }
         .padding(.top, 6)

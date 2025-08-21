@@ -19,14 +19,11 @@ struct MoreOptionsView: View {
                 Task {
                     dismiss()
                     
-                    if let albumId = viewModel.currentSong?.collectionId {
-                        await viewModel.fetchAlbumSongs(for: albumId)
-                    }
+                    viewModel.presentAlbumSheet()
                 }
             }) {
                 HStack(spacing: 16) {
-                    Image(systemName: "square.stack")
-                        .font(.title2)
+                    Image.Icons.icPlaylist
                     Text("Open Album")
                         .fontWeight(.medium)
                 }
