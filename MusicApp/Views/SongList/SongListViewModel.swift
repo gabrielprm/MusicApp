@@ -14,11 +14,17 @@ final class SongListViewModel: ObservableObject {
         case error(String)
     }
     
+    enum SearchMode: String, CaseIterable {
+        case keyword = "Keyword"
+        case semantic = "Semantic"
+    }
+    
     // MARK: - Published Properties
     
     @Published private(set) var state: State = .idle
     @Published private(set) var songs: [Song] = []
     @Published var searchText: String = ""
+    @Published var searchMode: SearchMode = .semantic
     
     // MARK: - Computed Properties
     
@@ -45,9 +51,14 @@ final class SongListViewModel: ObservableObject {
         state == .loaded && songs.isEmpty
     }
     
+    var isSemanticSearchAvailable: Bool {
+        semanticSearchService.isAvailable
+    }
+    
     // MARK: - Private Properties
     
     private let repository: SongRepositoryProtocol
+    private let semanticSearchService: SemanticSearchService
     private let resultsPerPage: Int
     
     private var currentPage = 1
@@ -55,15 +66,18 @@ final class SongListViewModel: ObservableObject {
     private var canLoadMorePages = true
     private var searchTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
+    private var allFetchedSongs: [Song] = [] // Store all fetched songs for semantic re-ranking
     
     // MARK: - Initializer
     
     init(
         resultsPerPage: Int = 20,
-        repository: SongRepositoryProtocol = SongRepository()
+        repository: SongRepositoryProtocol = SongRepository(),
+        semanticSearchService: SemanticSearchService = .shared
     ) {
         self.resultsPerPage = resultsPerPage
         self.repository = repository
+        self.semanticSearchService = semanticSearchService
         setupSearchDebounce()
     }
     
@@ -89,12 +103,15 @@ final class SongListViewModel: ObservableObject {
         
         guard !term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             songs.removeAll()
+            allFetchedSongs.removeAll()
+            semanticSearchService.clearIndex()
             state = .idle
             return
         }
         
         currentSearchTerm = term
         songs.removeAll()
+        allFetchedSongs.removeAll()
         currentPage = 1
         canLoadMorePages = true
         state = .loading
@@ -113,6 +130,7 @@ final class SongListViewModel: ObservableObject {
     
     private func performSearch() async {
         do {
+            // Fetch songs from API using keyword search
             let newSongs = try await repository.searchSongs(
                 for: currentSearchTerm,
                 page: currentPage,
@@ -125,14 +143,49 @@ final class SongListViewModel: ObservableObject {
                 canLoadMorePages = false
             }
             
-            songs.append(contentsOf: newSongs)
+            allFetchedSongs.append(contentsOf: newSongs)
             currentPage += 1
+            
+            // Apply semantic search if enabled and available
+            if searchMode == .semantic && semanticSearchService.isAvailable {
+                await applySemanticRanking()
+            } else {
+                songs = allFetchedSongs
+            }
+            
             state = .loaded
             
         } catch {
             guard !Task.isCancelled else { return }
             let message = (error as? LocalizedError)?.errorDescription ?? "An unknown error occurred."
             state = .error(message)
+        }
+    }
+    
+    /// Re-rank songs using semantic similarity to the search query
+    private func applySemanticRanking() async {
+        // Index all fetched songs
+        semanticSearchService.indexSongs(allFetchedSongs)
+        
+        // Get semantically ranked results
+        let rankedSongs = semanticSearchService.search(
+            query: currentSearchTerm,
+            limit: allFetchedSongs.count
+        )
+        
+        songs = rankedSongs.isEmpty ? allFetchedSongs : rankedSongs
+    }
+    
+    /// Toggle search mode and re-apply ranking
+    func toggleSearchMode() async {
+        searchMode = searchMode == .keyword ? .semantic : .keyword
+        
+        guard !allFetchedSongs.isEmpty else { return }
+        
+        if searchMode == .semantic && semanticSearchService.isAvailable {
+            await applySemanticRanking()
+        } else {
+            songs = allFetchedSongs
         }
     }
     

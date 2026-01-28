@@ -57,6 +57,10 @@ public struct PlayerView: View {
                     .preferredColorScheme(.dark)
             }
         }
+        .sheet(isPresented: $viewModel.showSimilarSongs) {
+            SimilarSongsView(viewModel: viewModel)
+                .preferredColorScheme(.dark)
+        }
     }
     
     var artWork: some View {

@@ -17,7 +17,7 @@ struct MoreOptionsView: View {
             optionsList
         }
         .padding(EdgeInsets(top: 32, leading: 20, bottom: 40, trailing: 20))
-        .presentationDetents([.height(280)])
+        .presentationDetents([.height(340)])
         .presentationDragIndicator(.visible)
     }
     
@@ -43,6 +43,13 @@ struct MoreOptionsView: View {
                 title: "Open Album"
             ) {
                 viewModel.presentAlbumSheet()
+            }
+            
+            OptionButton(
+                icon: Image(systemName: "brain"),
+                title: "Find Similar Songs"
+            ) {
+                viewModel.presentSimilarSongs()
             }
             
             ShareLink(item: "\(songTitle) by \(artistName)") {

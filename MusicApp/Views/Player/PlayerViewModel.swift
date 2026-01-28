@@ -28,6 +28,10 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
     @Published var showMoreOptions = false
     @Published var showAlbumSheet = false
     @Published var pendingAlbumSheet = false
+    @Published var showSimilarSongs = false
+    @Published var pendingSimilarSongs = false
+    @Published var similarSongs: [Song] = []
+    @Published var isLoadingSimilarSongs = false
     
     @Published var seekValue: Double = 0
     
@@ -192,11 +196,79 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
         showMoreOptions = false
     }
     
+    func presentSimilarSongs() {
+        pendingSimilarSongs = true
+        showMoreOptions = false
+    }
+    
     func onMoreOptionsDismissed() {
         if pendingAlbumSheet {
             pendingAlbumSheet = false
             showAlbumSheet = true
+        } else if pendingSimilarSongs {
+            pendingSimilarSongs = false
+            showSimilarSongs = true
+            Task {
+                await loadSimilarSongs()
+            }
         }
+    }
+    
+    // MARK: - Similar Songs
+    
+    func loadSimilarSongs() async {
+        guard let currentSong = currentSong else { return }
+        
+        isLoadingSimilarSongs = true
+        
+        // First, we need to fetch some songs to build an index
+        // We'll search using the current song's artist and genre
+        let searchTerms = [currentSong.artistName, currentSong.primaryGenreName]
+        let searchQuery = searchTerms.joined(separator: " ")
+        
+        do {
+            let repository = SongRepository()
+            var allSongs: [Song] = []
+            
+            // Fetch songs based on artist
+            let artistSongs = try await repository.searchSongs(
+                for: currentSong.artistName,
+                page: 1,
+                resultsPerPage: 25
+            )
+            allSongs.append(contentsOf: artistSongs)
+            
+            // Fetch songs based on genre
+            let genreSongs = try await repository.searchSongs(
+                for: currentSong.primaryGenreName,
+                page: 1,
+                resultsPerPage: 25
+            )
+            allSongs.append(contentsOf: genreSongs)
+            
+            // Remove duplicates and current song
+            let uniqueSongs = Array(Set(allSongs)).filter { $0.id != currentSong.id }
+            
+            // Index songs and find similar ones
+            let semanticService = SemanticSearchService.shared
+            semanticService.clearIndex()
+            semanticService.indexSongs(uniqueSongs)
+            
+            // Search using the current song's metadata as query
+            let query = "\(currentSong.trackName ?? "") \(currentSong.artistName) \(currentSong.primaryGenreName)"
+            similarSongs = semanticService.search(query: query, limit: 15)
+            
+            // If semantic search didn't work, fall back to the fetched songs
+            if similarSongs.isEmpty {
+                similarSongs = Array(uniqueSongs.prefix(15))
+            }
+            
+        } catch {
+            // On error, clear similar songs
+            similarSongs = []
+        }
+        
+        isLoadingSimilarSongs = false
     }
     
     // MARK: - Cleanup

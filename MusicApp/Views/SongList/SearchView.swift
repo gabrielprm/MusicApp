@@ -12,14 +12,42 @@ struct SearchView: View {
                     .navigationTitle("Songs")
                     .toolbarBackground(Color.black, for: .navigationBar)
                     .toolbarBackground(.visible, for: .navigationBar)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            searchModeToggle
+                        }
+                    }
             }
             .searchable(
                 text: $viewModel.searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Search"
+                prompt: viewModel.searchMode == .semantic ? "Semantic search..." : "Search"
             )
             .preferredColorScheme(.dark)
         }
+    }
+    
+    private var searchModeToggle: some View {
+        Button {
+            Task {
+                await viewModel.toggleSearchMode()
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: viewModel.searchMode == .semantic ? "brain" : "text.magnifyingglass")
+                Text(viewModel.searchMode.rawValue)
+                    .font(.caption)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(viewModel.searchMode == .semantic ? Color.purple.opacity(0.3) : Color.gray.opacity(0.3))
+            )
+        }
+        .disabled(!viewModel.isSemanticSearchAvailable && viewModel.searchMode == .keyword)
+        .accessibilityLabel("Search mode: \(viewModel.searchMode.rawValue)")
+        .accessibilityHint("Double tap to toggle between keyword and semantic search")
     }
     
     @ViewBuilder
@@ -46,6 +74,19 @@ struct SearchView: View {
     
     private var resultsListView: some View {
         List {
+            // Search mode indicator
+            if viewModel.searchMode == .semantic && !viewModel.songs.isEmpty {
+                HStack {
+                    Image(systemName: "brain")
+                        .foregroundColor(.purple)
+                    Text("Results ranked by semantic similarity")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .listRowBackground(Color.black)
+                .listRowSeparator(.hidden)
+            }
+            
             ForEach(viewModel.songs) { song in
                 NavigationLink(destination: PlayerView(viewModel: PlayerViewModel(song: song))) {
                     SongRowView(song: song)
@@ -78,14 +119,17 @@ struct SearchView: View {
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             Spacer()
-            Image(systemName: "music.magnifyingglass")
+            Image(systemName: viewModel.searchMode == .semantic ? "brain" : "music.magnifyingglass")
                 .font(.system(size: 60))
-                .foregroundColor(.secondary)
+                .foregroundColor(viewModel.searchMode == .semantic ? .purple : .secondary)
             Text("Find Your Favorite Music")
                 .font(.title2)
                 .fontWeight(.bold)
-            Text("Search for any song or artist to begin.")
+            Text(viewModel.searchMode == .semantic 
+                 ? "Try searching by mood, feeling, or theme.\nExample: \"sad girl winter\" or \"upbeat dance\""
+                 : "Search for any song or artist to begin.")
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
             Spacer()
         }
         .padding()
