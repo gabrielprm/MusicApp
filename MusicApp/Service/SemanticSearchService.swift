@@ -2,7 +2,7 @@ import Foundation
 import NaturalLanguage
 
 /// Service for performing semantic vector search on songs using NLEmbedding
-final class SemanticSearchService {
+final class SemanticSearchService: @unchecked Sendable {
     
     // MARK: - Singleton
     
@@ -12,17 +12,16 @@ final class SemanticSearchService {
     
     private let embedding: NLEmbedding?
     private var songVectors: [String: (song: Song, vector: [Double])] = [:]
+    private let lock = NSLock()
     
     // MARK: - Initializer
     
     private init() {
-        // Use sentence embedding for better semantic understanding
         self.embedding = NLEmbedding.sentenceEmbedding(for: .english)
     }
     
     // MARK: - Public Methods
     
-    /// Check if semantic search is available
     var isAvailable: Bool {
         embedding != nil
     }
@@ -31,6 +30,9 @@ final class SemanticSearchService {
     /// - Parameter songs: Array of songs to index
     func indexSongs(_ songs: [Song]) {
         guard let embedding = embedding else { return }
+        
+        lock.lock()
+        defer { lock.unlock() }
         
         for song in songs {
             let searchableText = createSearchableText(for: song)
@@ -41,8 +43,9 @@ final class SemanticSearchService {
         }
     }
     
-    /// Remove songs from the index
     func clearIndex() {
+        lock.lock()
+        defer { lock.unlock() }
         songVectors.removeAll()
     }
     
@@ -57,15 +60,17 @@ final class SemanticSearchService {
             return []
         }
         
-        // Calculate cosine similarity for each indexed song
+        lock.lock()
+        let currentVectors = songVectors
+        lock.unlock()
+        
         var scoredSongs: [(song: Song, similarity: Double)] = []
         
-        for (_, value) in songVectors {
+        for (_, value) in currentVectors {
             let similarity = cosineSimilarity(queryVector, value.vector)
             scoredSongs.append((song: value.song, similarity: similarity))
         }
         
-        // Sort by similarity (highest first) and return top results
         let sortedSongs = scoredSongs
             .sorted { $0.similarity > $1.similarity }
             .prefix(limit)
@@ -85,9 +90,13 @@ final class SemanticSearchService {
             return []
         }
         
+        lock.lock()
+        let currentVectors = songVectors
+        lock.unlock()
+        
         var scoredSongs: [(song: Song, score: Double)] = []
         
-        for (_, value) in songVectors {
+        for (_, value) in currentVectors {
             let similarity = cosineSimilarity(queryVector, value.vector)
             scoredSongs.append((song: value.song, score: similarity))
         }
@@ -104,13 +113,17 @@ final class SemanticSearchService {
     ///   - limit: Maximum number of similar songs to return
     /// - Returns: Array of similar songs
     func findSimilarSongs(to song: Song, limit: Int = 10) -> [Song] {
-        guard let songData = songVectors[song.id] else {
+        lock.lock()
+        let currentVectors = songVectors
+        lock.unlock()
+        
+        guard let songData = currentVectors[song.id] else {
             return []
         }
         
         var scoredSongs: [(song: Song, similarity: Double)] = []
         
-        for (id, value) in songVectors where id != song.id {
+        for (id, value) in currentVectors where id != song.id {
             let similarity = cosineSimilarity(songData.vector, value.vector)
             scoredSongs.append((song: value.song, similarity: similarity))
         }
@@ -122,8 +135,6 @@ final class SemanticSearchService {
     }
     
     // MARK: - Private Methods
-    
-    /// Create searchable text from song metadata
     private func createSearchableText(for song: Song) -> String {
         var components: [String] = []
         

@@ -1,11 +1,11 @@
 import Foundation
 
-protocol SongRepositoryProtocol {
+protocol SongRepositoryProtocol: Sendable {
     func searchSongs(for term: String, page: Int, resultsPerPage: Int) async throws -> [Song]
     func fetchSongs(forAlbumId albumId: Int) async throws -> [Song]
 }
 
-class SongRepository: SongRepositoryProtocol {
+final class SongRepository: SongRepositoryProtocol, @unchecked Sendable {
     private let apiService: APIServiceProtocol
 
     init(apiService: APIServiceProtocol = APIService()) {

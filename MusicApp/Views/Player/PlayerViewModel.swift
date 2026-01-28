@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 import Foundation
 import AVFoundation
+@preconcurrency import ObjectiveC
 
 public protocol PlayerViewModelProtocol {
     func selectSong(_ song: Song)
@@ -40,11 +41,11 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
     // MARK: - Private Properties
     
     private let repository: SongRepositoryProtocol
-    private var player: AVPlayer?
+    private nonisolated(unsafe) var player: AVPlayer?
     private var playerItemObserver: AnyCancellable?
-    private var timeObserver: Any?
-    private var playerItemStatusObserver: NSKeyValueObservation?
-    private var playerItemDidEndObserver: NSObjectProtocol?
+    private nonisolated(unsafe) var timeObserver: Any?
+    private nonisolated(unsafe) var playerItemStatusObserver: NSKeyValueObservation?
+    private nonisolated(unsafe) var playerItemDidEndObserver: NSObjectProtocol?
     
     // MARK: - Initializer
     
@@ -221,16 +222,10 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
         
         isLoadingSimilarSongs = true
         
-        // First, we need to fetch some songs to build an index
-        // We'll search using the current song's artist and genre
-        let searchTerms = [currentSong.artistName, currentSong.primaryGenreName]
-        let searchQuery = searchTerms.joined(separator: " ")
-        
         do {
             let repository = SongRepository()
             var allSongs: [Song] = []
             
-            // Fetch songs based on artist
             let artistSongs = try await repository.searchSongs(
                 for: currentSong.artistName,
                 page: 1,
@@ -238,7 +233,6 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
             )
             allSongs.append(contentsOf: artistSongs)
             
-            // Fetch songs based on genre
             let genreSongs = try await repository.searchSongs(
                 for: currentSong.primaryGenreName,
                 page: 1,
@@ -246,25 +240,20 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
             )
             allSongs.append(contentsOf: genreSongs)
             
-            // Remove duplicates and current song
             let uniqueSongs = Array(Set(allSongs)).filter { $0.id != currentSong.id }
             
-            // Index songs and find similar ones
             let semanticService = SemanticSearchService.shared
             semanticService.clearIndex()
             semanticService.indexSongs(uniqueSongs)
             
-            // Search using the current song's metadata as query
             let query = "\(currentSong.trackName ?? "") \(currentSong.artistName) \(currentSong.primaryGenreName)"
             similarSongs = semanticService.search(query: query, limit: 15)
             
-            // If semantic search didn't work, fall back to the fetched songs
             if similarSongs.isEmpty {
                 similarSongs = Array(uniqueSongs.prefix(15))
             }
             
         } catch {
-            // On error, clear similar songs
             similarSongs = []
         }
         

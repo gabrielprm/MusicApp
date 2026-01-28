@@ -177,9 +177,23 @@ private extension CachedAsyncImage {
 
 // MARK: - AsyncImageURLSession
 
-private class URLSessionTaskController: NSObject, URLSessionTaskDelegate {
+private final class URLSessionTaskController: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     
-    var metrics: URLSessionTaskMetrics?
+    private let lock = NSLock()
+    private var _metrics: URLSessionTaskMetrics?
+    
+    var metrics: URLSessionTaskMetrics? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _metrics
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            _metrics = newValue
+        }
+    }
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
         self.metrics = metrics

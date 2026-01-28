@@ -20,12 +20,12 @@ enum APIError: Error, LocalizedError {
     }
 }
 
-protocol APIServiceProtocol {
+protocol APIServiceProtocol: Sendable {
     func search(term: String, limit: Int, offset: Int) async throws -> SearchResponse
     func fetchSongs(forAlbumId albumId: Int) async throws -> SearchResponse
 }
 
-final class APIService: APIServiceProtocol {
+final class APIService: APIServiceProtocol, Sendable {
     
     // MARK: - Constants
     

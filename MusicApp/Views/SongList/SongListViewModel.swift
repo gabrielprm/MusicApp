@@ -130,7 +130,6 @@ final class SongListViewModel: ObservableObject {
     
     private func performSearch() async {
         do {
-            // Fetch songs from API using keyword search
             let newSongs = try await repository.searchSongs(
                 for: currentSearchTerm,
                 page: currentPage,
@@ -146,7 +145,6 @@ final class SongListViewModel: ObservableObject {
             allFetchedSongs.append(contentsOf: newSongs)
             currentPage += 1
             
-            // Apply semantic search if enabled and available
             if searchMode == .semantic && semanticSearchService.isAvailable {
                 await applySemanticRanking()
             } else {
@@ -162,12 +160,9 @@ final class SongListViewModel: ObservableObject {
         }
     }
     
-    /// Re-rank songs using semantic similarity to the search query
     private func applySemanticRanking() async {
-        // Index all fetched songs
         semanticSearchService.indexSongs(allFetchedSongs)
         
-        // Get semantically ranked results
         let rankedSongs = semanticSearchService.search(
             query: currentSearchTerm,
             limit: allFetchedSongs.count
@@ -176,7 +171,6 @@ final class SongListViewModel: ObservableObject {
         songs = rankedSongs.isEmpty ? allFetchedSongs : rankedSongs
     }
     
-    /// Toggle search mode and re-apply ranking
     func toggleSearchMode() async {
         searchMode = searchMode == .keyword ? .semantic : .keyword
         

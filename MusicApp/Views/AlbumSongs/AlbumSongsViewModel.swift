@@ -82,7 +82,7 @@ final class AlbumSongsViewModel: ObservableObject {
             let tracks = try await repository.fetchSongs(forAlbumId: albumId)
             state = .loaded(tracks)
         } catch {
-            hasFetched = false // Allow retry on error
+            hasFetched = false
             let message = (error as? LocalizedError)?.errorDescription ?? "Failed to load album."
             state = .error(message)
         }
