@@ -25,65 +25,72 @@ protocol APIServiceProtocol {
     func fetchSongs(forAlbumId albumId: Int) async throws -> SearchResponse
 }
 
-class APIService: APIServiceProtocol {
-    private let baseSearchURL = "https://itunes.apple.com/search"
-    private let baseLookupURL = "https://itunes.apple.com/lookup"
+final class APIService: APIServiceProtocol {
+    
+    // MARK: - Constants
+    
+    private enum Endpoint {
+        static let search = "https://itunes.apple.com/search"
+        static let lookup = "https://itunes.apple.com/lookup"
+    }
+    
+    // MARK: - Dependencies
+    
+    private let session: URLSession
+    private let decoder: JSONDecoder
+    
+    // MARK: - Initializer
+    
+    init(session: URLSession = .shared) {
+        self.session = session
+        self.decoder = JSONDecoder()
+    }
+    
+    // MARK: - Public Methods
     
     func search(term: String, limit: Int, offset: Int) async throws -> SearchResponse {
-        var components = URLComponents(string: baseSearchURL)
+        var components = URLComponents(string: Endpoint.search)
         components?.queryItems = [
             URLQueryItem(name: "term", value: term),
             URLQueryItem(name: "entity", value: "song"),
             URLQueryItem(name: "limit", value: String(limit)),
             URLQueryItem(name: "offset", value: String(offset))
         ]
-
-        guard let url = components?.url else {
-            throw APIError.invalidURL
-        }
-
-        do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                throw APIError.invalidResponse
-            }
-
-            let decoder = JSONDecoder()
-            let searchResponse = try decoder.decode(SearchResponse.self, from: data)
-            return searchResponse
-
-        } catch let error as DecodingError {
-            throw APIError.decodingError(description: error.localizedDescription)
-        } catch {
-            throw APIError.requestFailed(description: error.localizedDescription)
-        }
+        
+        return try await fetch(from: components)
     }
     
     func fetchSongs(forAlbumId albumId: Int) async throws -> SearchResponse {
-        var components = URLComponents(string: baseLookupURL)
+        var components = URLComponents(string: Endpoint.lookup)
         components?.queryItems = [
             URLQueryItem(name: "id", value: String(albumId)),
             URLQueryItem(name: "entity", value: "song")
         ]
         
+        return try await fetch(from: components)
+    }
+    
+    // MARK: - Private Methods
+    
+    private func fetch<T: Decodable>(from components: URLComponents?) async throws -> T {
         guard let url = components?.url else {
             throw APIError.invalidURL
         }
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await session.data(from: url)
             
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
                 throw APIError.invalidResponse
             }
             
-            let decoder = JSONDecoder()
-            let searchResponse = try decoder.decode(SearchResponse.self, from: data)
-            return searchResponse
+            return try decoder.decode(T.self, from: data)
             
         } catch let error as DecodingError {
             throw APIError.decodingError(description: error.localizedDescription)
+        } catch let error as APIError {
+            throw error
         } catch {
             throw APIError.requestFailed(description: error.localizedDescription)
         }

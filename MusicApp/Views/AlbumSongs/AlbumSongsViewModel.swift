@@ -1,20 +1,64 @@
-import SwiftUI
-import Combine
 import Foundation
 
 @MainActor
 final class AlbumSongsViewModel: ObservableObject {
     
-    // MARK: - Published Properties for UI
+    // MARK: - State
     
-    @Published var albumSongs: [Song] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
+    enum State: Equatable {
+        case idle
+        case loading
+        case loaded([Song])
+        case error(String)
+    }
+    
+    // MARK: - Published Properties
+    
+    @Published private(set) var state: State = .idle
+    
+    // MARK: - Computed Properties
+    
+    var albumSongs: [Song] {
+        if case .loaded(let songs) = state {
+            return songs
+        }
+        return []
+    }
+    
+    var albumName: String {
+        albumSongs.first?.collectionName ?? "Album"
+    }
+    
+    var isLoading: Bool {
+        state == .loading
+    }
+    
+    var errorMessage: String? {
+        if case .error(let message) = state {
+            return message
+        }
+        return nil
+    }
+    
+    var hasError: Bool {
+        if case .error = state {
+            return true
+        }
+        return false
+    }
+    
+    var isEmpty: Bool {
+        if case .loaded(let songs) = state {
+            return songs.isEmpty
+        }
+        return false
+    }
     
     // MARK: - Private Properties
     
     private let repository: SongRepositoryProtocol
     private let albumId: Int
+    private var hasFetched = false
     
     // MARK: - Initializer
     
@@ -29,17 +73,24 @@ final class AlbumSongsViewModel: ObservableObject {
     // MARK: - Data Fetching Methods
     
     func fetchAlbumSongs() async {
-        isLoading = true
-        errorMessage = nil
+        guard !hasFetched, state != .loading else { return }
+        
+        hasFetched = true
+        state = .loading
         
         do {
             let tracks = try await repository.fetchSongs(forAlbumId: albumId)
-            self.albumSongs = tracks
-            
+            state = .loaded(tracks)
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load album."
+            hasFetched = false // Allow retry on error
+            let message = (error as? LocalizedError)?.errorDescription ?? "Failed to load album."
+            state = .error(message)
         }
-        
-        isLoading = false
+    }
+    
+    func retry() async {
+        hasFetched = false
+        state = .idle
+        await fetchAlbumSongs()
     }
 }

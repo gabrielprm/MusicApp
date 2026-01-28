@@ -44,7 +44,9 @@ public struct PlayerView: View {
                 }
             }
         }
-        .sheet(isPresented: $viewModel.showMoreOptions) {
+        .sheet(isPresented: $viewModel.showMoreOptions, onDismiss: {
+            viewModel.onMoreOptionsDismissed()
+        }) {
             MoreOptionsView(viewModel: viewModel)
                 .preferredColorScheme(.dark)
         }

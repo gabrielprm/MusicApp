@@ -2,35 +2,45 @@ import SwiftUI
 
 struct SearchView: View {
     @StateObject private var viewModel = SongListViewModel()
-    @State private var searchTerm = ""
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
             NavigationStack {
-                Group {
-                    if viewModel.songs.isEmpty && !viewModel.isLoading && viewModel.errorMessage == nil {
-                        emptyStateView
-                    } else {
-                        resultsListView
-                    }
-                }
-                .navigationTitle("Songs")
-                .toolbarBackground(Color.black, for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
+                content
+                    .navigationTitle("Songs")
+                    .toolbarBackground(Color.black, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
             }
             .searchable(
-                text: $searchTerm,
+                text: $viewModel.searchText,
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "Search"
             )
-            .onSubmit(of: .search) {
-                Task {
-                    await viewModel.search(for: searchTerm)
-                }
-            }
             .preferredColorScheme(.dark)
+        }
+    }
+    
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel.state {
+        case .idle:
+            emptyStateView
+            
+        case .loading:
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            
+        case .loaded, .loadingMore:
+            if viewModel.songs.isEmpty {
+                noResultsView
+            } else {
+                resultsListView
+            }
+            
+        case .error(let message):
+            errorView(message: message)
         }
     }
     
@@ -50,26 +60,73 @@ struct SearchView: View {
                 }
                 .listRowSeparator(.hidden)
             }
+            
+            if viewModel.isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.black)
+            }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .overlay {
-            if viewModel.isLoading && viewModel.songs.isEmpty {
-                ProgressView()
-            } else if let errorMessage = viewModel.errorMessage {
-                ContentUnavailableView(errorMessage, systemImage: "exclamationmark.triangle")
-            }
-        }
     }
 
     private var emptyStateView: some View {
         VStack(spacing: 12) {
             Spacer()
+            Image(systemName: "music.magnifyingglass")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
             Text("Find Your Favorite Music")
                 .font(.title2)
                 .fontWeight(.bold)
             Text("Search for any song or artist to begin.")
                 .foregroundColor(.secondary)
+            Spacer()
+        }
+        .padding()
+        .background(.black)
+    }
+    
+    private var noResultsView: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Image(systemName: "music.note.list")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            Text("No Results Found")
+                .font(.title2)
+                .fontWeight(.bold)
+            Text("Try a different search term.")
+                .foregroundColor(.secondary)
+            Spacer()
+        }
+        .padding()
+        .background(.black)
+    }
+    
+    private func errorView(message: String) -> some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 60))
+                .foregroundColor(.red)
+            Text("Something went wrong")
+                .font(.title2)
+                .fontWeight(.bold)
+            Text(message)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Retry") {
+                Task {
+                    await viewModel.retry()
+                }
+            }
+            .buttonStyle(.borderedProminent)
             Spacer()
         }
         .padding()

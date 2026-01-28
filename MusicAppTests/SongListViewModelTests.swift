@@ -68,18 +68,35 @@ final class SongListViewModelTests: XCTestCase {
         
         viewModel = SongListViewModel(resultsPerPage: 2, repository: mockRepository)
         
-        // When
+        // When - Initial search
         await viewModel.search(for: "test")
         
         // Then
         XCTAssertEqual(viewModel.songs.count, 2, "Initial search should only load the first page.")
+        XCTAssertEqual(viewModel.state, .loaded, "State should be .loaded after successful search.")
         
-        // When
+        // When - Load more
         await viewModel.loadMoreSongs()
         
         // Then
         XCTAssertEqual(viewModel.songs.count, 4, "Should append the second page of songs to the list.")
         XCTAssertEqual(viewModel.songs.last?.trackName, "West Coast")
+    }
+    
+    func test_retry_shouldResetAndSearch() async {
+        // Given
+        mockRepository.mockError = APIError.requestFailed(description: "Network error")
+        await viewModel.search(for: "test")
+        XCTAssertNotNil(viewModel.errorMessage)
+        
+        // When - Fix the error and retry
+        mockRepository.mockError = nil
+        mockRepository.mockSongs = Song.mockedDataPage1
+        await viewModel.retry()
+        
+        // Then
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertEqual(viewModel.songs.count, 2)
     }
 }
 

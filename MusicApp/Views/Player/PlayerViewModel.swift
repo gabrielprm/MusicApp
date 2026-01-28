@@ -27,6 +27,7 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
     
     @Published var showMoreOptions = false
     @Published var showAlbumSheet = false
+    @Published var pendingAlbumSheet = false
     
     @Published var seekValue: Double = 0
     
@@ -53,7 +54,6 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
     }
     
     deinit {
-        // Cleanup directly in deinit without calling @MainActor method
         player?.pause()
         if let timeObserver = timeObserver {
             player?.removeTimeObserver(timeObserver)
@@ -163,7 +163,6 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
             player?.pause()
             isPlaying = false
         } else {
-            // If at the end, restart from beginning
             if currentTime >= duration - 0.1 {
                 seek(to: 0)
             }
@@ -189,7 +188,15 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
     }
         
     func presentAlbumSheet() {
-        showAlbumSheet = true
+        pendingAlbumSheet = true
+        showMoreOptions = false
+    }
+    
+    func onMoreOptionsDismissed() {
+        if pendingAlbumSheet {
+            pendingAlbumSheet = false
+            showAlbumSheet = true
+        }
     }
     
     // MARK: - Cleanup
