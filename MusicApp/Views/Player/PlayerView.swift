@@ -100,6 +100,14 @@ public struct PlayerView: View {
                 .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(.white.opacity(0.8))
                 .frame(maxWidth: .infinity, alignment: .leading)
+            
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.red.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 10)
@@ -147,23 +155,34 @@ public struct PlayerView: View {
                     .resizable()
                     .frame(width: 48, height: 48)
             }
+            .disabled(viewModel.isLoading)
+            
             Button(action: viewModel.playPause) {
                 ZStack {
                     Circle()
                         .fill(.white)
                         .frame(width: 64, height: 64)
-                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundStyle(.black)
-                        .offset(x: viewModel.isPlaying ? 0 : 2)
+                    
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                    } else {
+                        Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(.black)
+                            .offset(x: viewModel.isPlaying ? 0 : 2)
+                    }
                 }
                 .accessibilityLabel(viewModel.isPlaying ? "Pause" : "Play")
             }
+            .disabled(viewModel.isLoading)
+            
             Button(action: viewModel.skipForward) {
                 Image.Icons.icForward
                     .resizable()
                     .frame(width: 48, height: 48)
             }
+            .disabled(viewModel.isLoading)
         }
         .padding(.top, 6)
     }
