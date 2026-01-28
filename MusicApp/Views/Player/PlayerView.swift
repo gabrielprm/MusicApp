@@ -7,18 +7,28 @@ public struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
 
     public var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                Spacer(minLength: 40)
-                artWork
-                Spacer()
-                songMetadata
-                songSlider
-                songControls
+        GeometryReader { geometry in
+            ZStack {
+                // Blurred album cover background
+                backgroundView(size: geometry.size)
+                
+                // Dark overlay for better readability
+                Color.black.opacity(0.4)
+                
+                VStack(spacing: 0) {
+                    Spacer(minLength: 40)
+                    
+                    // Central space for future features
+                    centralContentArea
+                    
+                    Spacer()
+                    
+                    // Bottom controls section
+                    bottomSection
+                }
             }
         }
+        .ignoresSafeArea()
         .onChange(of: viewModel.currentTime) { _, new in
             if !isSeeking { viewModel.seekValue = new }
         }
@@ -63,26 +73,77 @@ public struct PlayerView: View {
         }
     }
     
-    var artWork: some View {
-        Group {
-            CachedAsyncImage(url: viewModel.currentSong?.artworkUrlLarge) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    songEmptyImageView
-                case .empty:
-                    ProgressView()
-                @unknown default:
-                    songEmptyImageView
-                }
+    // MARK: - Background
+    
+    private func backgroundView(size: CGSize) -> some View {
+        CachedAsyncImage(url: viewModel.currentSong?.artworkUrlLarge) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size.width, height: size.height)
+                    .blur(radius: 50)
+                    .scaleEffect(1.2)
+            case .failure, .empty:
+                Color.black
+                    .frame(width: size.width, height: size.height)
+            @unknown default:
+                Color.black
+                    .frame(width: size.width, height: size.height)
             }
-         }
-         .frame(width: 200, height: 200)
-         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-         .padding(.bottom, 36)
+        }
+        .clipped()
+    }
+    
+    // MARK: - Central Content Area (for future features)
+    
+    private var centralContentArea: some View {
+        VStack(spacing: 20) {
+            artWork
+        }
+    }
+    
+    // MARK: - Bottom Section
+    
+    private var bottomSection: some View {
+        VStack(spacing: 0) {
+            songMetadata
+            songSlider
+            songControls
+        }
+        .padding(.bottom, 34) // Safe area for home indicator
+        .background(
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.8)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .padding(.top, -100)
+        )
+    }
+    
+    // MARK: - Artwork
+    
+    var artWork: some View {
+        CachedAsyncImage(url: viewModel.currentSong?.artworkUrlLarge) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFill()
+            case .failure:
+                songEmptyImageView
+            case .empty:
+                ProgressView()
+                    .frame(width: 280, height: 280)
+            @unknown default:
+                songEmptyImageView
+            }
+        }
+        .frame(width: 280, height: 280)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 10)
     }
     
     var songEmptyImageView: some View {
