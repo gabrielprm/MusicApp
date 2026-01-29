@@ -1,102 +1,68 @@
 # MusicApp 🎵
 
-A modern, fully-featured iOS music application built with SwiftUI and Swift 6, demonstrating advanced features like semantic vector search, custom audio playback, and clean MVVM architecture.
+A high-performance iOS music application built with **Swift 6** and **SwiftUI**, engineered to demonstrate advanced signal processing, strict concurrency, and clean architecture.
+
+Beyond standard playback, this project implements a **real-time FFT audio visualizer** from scratch, bridging low-level audio buffers to high-level UI animations with 60fps performance.
+
+## 🚀 Engineering Highlights (High-Performance Focus)
+
+This project goes beyond standard iOS patterns to solve complex engineering challenges:
+
+- **Real-Time Signal Processing (FFT):** Implements a custom **Fast Fourier Transform** engine using Apple's `Accelerate` framework (`vDSP`). It processes raw PCM audio buffers in real-time to render a frequency-accurate 60fps visualizer, handling windowing, magnitude calculation, and decibel normalization manually.
+- **Custom Audio Engine Architecture:** Replaces the standard `AVPlayer` streaming model with a robust **Download-and-Process** architecture using `AVAudioEngine` and `AVAudioNodeTap`. This allows for low-latency access to raw audio data that is impossible with standard streaming APIs.
+- **Strict Concurrency & Thread Safety:** Demonstrates mastery of Swift 6 Concurrency. Safely bridges high-frequency background audio callbacks (running on real-time threads) to the UI's Main Actor using `Combine` pipelines and isolated data storage, ensuring zero main-thread blocking or race conditions.
+- **Semantic Vector Search:** Uses on-device Machine Learning (`NLEmbedding`) to generate vector embeddings for songs, enabling "Search by Meaning" (e.g., finding "Sad girl winter" songs) via Cosine Similarity calculations.
 
 ## 🌟 Key Features
 
+### 🎧 Immersive Player & Visualizer
+- **60fps Audio Visualizer:** Dynamic frequency bars that react to the music in real-time.
+- **Offline-First Playback:** Smart caching strategy for preview assets to ensure instant playback and analysis.
+- **Interactive Controls:** Custom scrubbing slider and blurred dynamic backgrounds.
+
 ### 🔍 Advanced Search
 - **Dual Search Modes**:
-  - **Standard Search**: Keyword-based search using the iTunes API.
-  - **Semantic Search**: Find songs by meaning (e.g., "Sad girl winter") using on-device Vector Embeddings (`NLEmbedding`).
-- **Real-time Experience**: Debounced search input for smooth user interaction.
-- **State Management**: Robust handling of loading, error, empty, and content states.
-
-### 🎧 Immersive Player
-- **Audio Playback**: Custom implementation using `AVFoundation` and `AVPlayer` to play song previews.
-- **Modern UI**: Full-screen player with a dynamic, blurred album art background.
-- **Interactive Controls**: Custom slider for scrubbing, play/pause, and skip controls.
-- **Smart Discovery**: "Find Similar Songs" feature that uses vector similarity to suggest related tracks based on the currently playing song's metadata (Artist + Genre).
-
-### 📱 UI/UX
-- **Album Integration**: View full tracklists for albums.
-- **Components**: Custom-built `CachedAsyncImage` for efficient image loading and caching.
-- **Accessibility**: Comprehensive accessibility labels and hints for VoiceOver support.
-- **Sheet Management**: Improved navigation flow with proper sheet chaining and presentation logic.
-
-## 🏗 Architecture
-
-The project follows a clean **MVVM (Model-View-ViewModel)** architecture with a focus on separation of concerns and testability.
-
-### Core Layers
-- **Views**: Pure SwiftUI views driven by state. Use `@State`, `@Binding`, and `@EnvironmentObject`.
-- **ViewModels**: Manage business logic and UI state. specific ViewModels (`PlayerViewModel`, `SongListViewModel`) communicate with services.
-- **Services**:
-  - `APIService`: Generic, protocol-oriented network layer with `async/await`.
-  - `SemanticSearchService`: Handles vector embedding generation and cosine similarity calculations.
-- **Repositories**: `SongRepository` abstracts data fetching strategies.
-- **Models**: Decodable structs representing iTunes API responses.
+  - **Standard**: Keyword-based search via iTunes API.
+  - **Semantic**: Vector-based search for "vibe-based" discovery.
+- **Smart Discovery**: "Find Similar Songs" feature that uses vector mathematics to find nearest neighbors in the embedding space.
 
 ## 🛠 Tech Stack
 
-- **Language**: Swift 6
+- **Language**: Swift 6 (Strict Concurrency enabled)
 - **UI Framework**: SwiftUI
-- **Concurrency**: Swift Async/Await, Actors, `@Sendable`, `Task`.
-- **Audio**: AVFoundation (`AVPlayer`, `AVPlayerItem`).
-- **AI/ML**: NaturalLanguage Framework (`NLEmbedding`).
-- **Networking**: `URLSession` with structured concurrency.
+- **Signal Processing**: `Accelerate` (vDSP), `AVAudioEngine`, `AVAudioNodeTap`.
+- **Concurrency**: Actors, `TaskGroup`, `Combine`, `@MainActor`.
+- **AI/ML**: NaturalLanguage (`NLEmbedding`).
+- **Architecture**: MVVM with Protocol-Oriented Services.
+
+## 🏗 Architecture
+
+The project follows a clean **MVVM** pattern, enforcing strict separation between the View logic and the complex Audio/AI processing.
+
+### Core Layers
+- **Audio Analysis Layer**: `AudioAnalyzer` is an isolated service that handles raw buffer pointer manipulation and FFT math, keeping ViewModels clean.
+- **ViewModels**: `PlayerViewModel` acts as the coordinator, managing the state machine between the `AVAudioEngine` and the SwiftUI View.
+- **Services**:
+  - `APIService`: `async/await` networking layer.
+  - `SemanticSearchService`: Vector embedding generation.
+- **Repositories**: Abstracts data sources for testability.
 
 ## 📁 Project Structure
 
-```
+```text
 MusicApp/
 ├── App/
-│   ├── MusicAppApp.swift       # App Entry Point
-│   └── Info.plist
+│   └── MusicAppApp.swift           # App Entry Point
 ├── Views/
-│   ├── SongList/               # Search & Home Screen
-│   ├── Player/                 # Music Player & Controls
-│   ├── AlbumSongs/             # Album Detail View
-│   ├── SimilarSongs/           # Vector-based recommendations
-│   └── MoreOptions/            # Context menus
-├── ViewModels/
-│   ├── SongListViewModel.swift
-│   ├── PlayerViewModel.swift
-│   └── AlbumSongsViewModel.swift
+│   ├── Player/                     # Visualizer & Controls
+│   ├── SongList/                   # Home & Search
+│   └── Components/                 # AudioVisualizerView.swift
 ├── Service/
-│   ├── APIService.swift        # Networking
-│   └── SemanticSearchService.swift # Vector Search Logic
-├── Models/
-│   └── ITunesAPIResponse.swift # Data Models
-├── Components/                 # Reusable UI (Images, Sliders)
-└── Helpers/                    # Extensions & Constants
-```
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Xcode 18.0+ (Swift 6 support recommended)
-- iOS 18.5+ Target
-
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/MusicApp.git
-   ```
-2. Open `MusicApp.xcodeproj` in Xcode.
-3. Select a simulator or physical device.
-4. Press `Cmd + R` to run.
-
-## 🧪 Testing
-
-The project includes unit tests for key logic:
-- `SongListViewModelTests`
-- `PlayerViewModelTests`
-- `AlbumSongsViewModelTests`
-
-Run tests using `Cmd + U`.
-
-## 📜 License
-
-This project is for educational purposes. All music data is provided by the iTunes Search API.
-
----
+│   ├── AudioAnalyzer.swift         # [High Complexity] FFT & Signal Processing
+│   ├── SemanticSearchService.swift # [High Complexity] Vector Embeddings
+│   └── APIService.swift            # Networking
+├── ViewModels/
+│   ├── PlayerViewModel.swift       # Audio Engine Management
+│   └── SongListViewModel.swift
+└── Models/
+    └── ITunesAPIResponse.swift
