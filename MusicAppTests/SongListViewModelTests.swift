@@ -18,6 +18,28 @@ final class SongListViewModelTests: XCTestCase {
         mockRepository = nil
         super.tearDown()
     }
+    
+    // MARK: - Helpers
+    
+    private func waitForState(_ expectedState: SongListViewModel.State, timeout: TimeInterval = 2.0) async throws {
+        let start = Date()
+        while viewModel.state != expectedState {
+            if Date().timeIntervalSince(start) > timeout {
+                throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timeout waiting for state \(expectedState)"])
+            }
+            try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        }
+    }
+    
+    private func waitForNonIdleState(timeout: TimeInterval = 2.0) async throws {
+        let start = Date()
+        while viewModel.state == .idle || viewModel.state == .loading {
+            if Date().timeIntervalSince(start) > timeout {
+                throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timeout waiting for non-idle state"])
+            }
+            try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        }
+    }
 
     // MARK: - Test Cases
 
@@ -28,6 +50,9 @@ final class SongListViewModelTests: XCTestCase {
         
         // When
         await viewModel.search(for: searchTerm)
+        
+        // Wait for the state to become loaded
+        try? await waitForState(.loaded)
         
         // Then
         XCTAssertFalse(viewModel.songs.isEmpty, "The songs array should not be empty after a successful search.")
@@ -56,6 +81,9 @@ final class SongListViewModelTests: XCTestCase {
         // When
         await viewModel.search(for: searchTerm)
         
+        // Wait for the search task to complete
+        try? await waitForNonIdleState()
+        
         // Then
         XCTAssertTrue(viewModel.songs.isEmpty, "The songs array should be empty when an error occurs.")
         XCTAssertNotNil(viewModel.errorMessage, "The error message should be set.")
@@ -71,12 +99,18 @@ final class SongListViewModelTests: XCTestCase {
         // When - Initial search
         await viewModel.search(for: "test")
         
+        // Wait for loaded state
+        try? await waitForState(.loaded)
+        
         // Then
         XCTAssertEqual(viewModel.songs.count, 2, "Initial search should only load the first page.")
         XCTAssertEqual(viewModel.state, .loaded, "State should be .loaded after successful search.")
         
         // When - Load more
         await viewModel.loadMoreSongs()
+        
+        // Wait for loaded state again
+        try? await waitForState(.loaded)
         
         // Then
         XCTAssertEqual(viewModel.songs.count, 4, "Should append the second page of songs to the list.")
@@ -87,12 +121,18 @@ final class SongListViewModelTests: XCTestCase {
         // Given
         mockRepository.mockError = APIError.requestFailed(description: "Network error")
         await viewModel.search(for: "test")
+        
+        // Wait for error state
+        try? await waitForNonIdleState()
         XCTAssertNotNil(viewModel.errorMessage)
         
         // When - Fix the error and retry
         mockRepository.mockError = nil
         mockRepository.mockSongs = Song.mockedDataPage1
         await viewModel.retry()
+        
+        // Wait for loaded state
+        try? await waitForState(.loaded)
         
         // Then
         XCTAssertNil(viewModel.errorMessage)
@@ -108,7 +148,7 @@ extension Song {
                 kind: "song",
                 trackId: 2,
                 trackName: "Video Games",
-                previewUrl: nil,
+                previewUrl: URL(string: "https://example.com/preview.m4a"),
                 trackTimeMillis: 282000,
                 trackPrice: 1.29,
                 artistName: "Lana Del Rey",
@@ -123,7 +163,7 @@ extension Song {
                 kind: "song",
                 trackId: 3,
                 trackName: "Summertime Sadness",
-                previewUrl: nil,
+                previewUrl: URL(string: "https://example.com/preview.m4a"),
                 trackTimeMillis: 282000,
                 trackPrice: 1.29,
                 artistName: "Lana Del Rey",
@@ -143,7 +183,7 @@ extension Song {
                 kind: "song",
                 trackId: 4,
                 trackName: "Born to Die",
-                previewUrl: nil,
+                previewUrl: URL(string: "https://example.com/preview.m4a"),
                 trackTimeMillis: 282000,
                 trackPrice: 1.29,
                 artistName: "Lana Del Rey",
@@ -158,7 +198,7 @@ extension Song {
                 kind: "song",
                 trackId: 5,
                 trackName: "West Coast",
-                previewUrl: nil,
+                previewUrl: URL(string: "https://example.com/preview.m4a"),
                 trackTimeMillis: 282000,
                 trackPrice: 1.29,
                 artistName: "Lana Del Rey",

@@ -36,11 +36,22 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
     
     @Published var seekValue: Double = 0
     
+    // MARK: - Visualizer Properties
+    
+    @Published var showVisualizer = false
+    @Published var pendingVisualizer = false
+    @Published var visualizerStyle: VisualizerStyle = .bars
+    @Published var magnitudes: [Float] = Array(repeating: 0.0, count: 64)
+    @Published var isVisualizerMode: Bool = false
+    
     let song: Song
     
     // MARK: - Private Properties
     
     private let repository: SongRepositoryProtocol
+    private let audioAnalyzer = AudioAnalyzer.shared
+    private var analyzerCancellables = Set<AnyCancellable>()
+    
     private nonisolated(unsafe) var player: AVPlayer?
     private var playerItemObserver: AnyCancellable?
     private nonisolated(unsafe) var timeObserver: Any?
@@ -202,6 +213,11 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
         showMoreOptions = false
     }
     
+    func presentVisualizer() {
+        pendingVisualizer = true
+        showMoreOptions = false
+    }
+    
     func onMoreOptionsDismissed() {
         if pendingAlbumSheet {
             pendingAlbumSheet = false
@@ -212,7 +228,99 @@ final class PlayerViewModel: ObservableObject, @preconcurrency PlayerViewModelPr
             Task {
                 await loadSimilarSongs()
             }
+        } else if pendingVisualizer {
+            pendingVisualizer = false
+            showVisualizer = true
+            Task {
+                await startVisualizerMode()
+            }
         }
+    }
+    
+    // MARK: - Visualizer Mode
+    
+    func startVisualizerMode() async {
+        guard let song = currentSong,
+              let previewUrl = song.previewUrl else {
+            errorMessage = "No preview available for visualizer"
+            return
+        }
+        
+        // Stop current player
+        cleanupPlayer()
+        isVisualizerMode = true
+        
+        // Bind to AudioAnalyzer
+        bindToAudioAnalyzer()
+        
+        // Start the audio analyzer
+        await audioAnalyzer.downloadAndPlay(url: previewUrl)
+    }
+    
+    func stopVisualizerMode() {
+        audioAnalyzer.stop()
+        analyzerCancellables.removeAll()
+        isVisualizerMode = false
+        magnitudes = Array(repeating: 0.0, count: 64)
+        
+        // Restart regular player if song is selected
+        if let song = currentSong, let url = song.previewUrl {
+            setupPlayer(with: url)
+        }
+    }
+    
+    private func bindToAudioAnalyzer() {
+        analyzerCancellables.removeAll()
+        
+        audioAnalyzer.$magnitudes
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (newMagnitudes: [Float]) in
+                self?.magnitudes = newMagnitudes
+            }
+            .store(in: &analyzerCancellables)
+        
+        audioAnalyzer.$isPlaying
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] playing in
+                self?.isPlaying = playing
+            }
+            .store(in: &analyzerCancellables)
+        
+        audioAnalyzer.$isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] loading in
+                self?.isLoading = loading
+            }
+            .store(in: &analyzerCancellables)
+        
+        audioAnalyzer.$currentTime
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] time in
+                self?.currentTime = time
+            }
+            .store(in: &analyzerCancellables)
+        
+        audioAnalyzer.$duration
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] dur in
+                self?.duration = dur
+            }
+            .store(in: &analyzerCancellables)
+        
+        audioAnalyzer.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] error in
+                self?.errorMessage = error
+            }
+            .store(in: &analyzerCancellables)
+    }
+    
+    func visualizerPlayPause() {
+        audioAnalyzer.playPause()
+    }
+    
+    func visualizerSeek(to time: Double) {
+        audioAnalyzer.seek(to: time)
     }
     
     // MARK: - Similar Songs

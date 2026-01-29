@@ -52,6 +52,13 @@ struct MoreOptionsView: View {
                 viewModel.presentSimilarSongs()
             }
             
+            OptionButton(
+                icon: Image(systemName: "waveform"),
+                title: "Audio Visualizer"
+            ) {
+                viewModel.presentVisualizer()
+            }
+            
             ShareLink(item: "\(songTitle) by \(artistName)") {
                 HStack(spacing: 16) {
                     Image(systemName: "square.and.arrow.up")

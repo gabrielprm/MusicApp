@@ -71,6 +71,11 @@ public struct PlayerView: View {
             SimilarSongsView(viewModel: viewModel)
                 .preferredColorScheme(.dark)
         }
+        .fullScreenCover(isPresented: $viewModel.showVisualizer) {
+            VisualizerView()
+                .environmentObject(viewModel)
+                .preferredColorScheme(.dark)
+        }
     }
     
     // MARK: - Background
